@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Dogfight & Racing Game</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- HUD/UI Overlays -->
+    <div id="ui-container">
+      <div id="crosshair">+</div>
+      <div id="controls-hint">
+        [Mouse]: Pitch/Yaw (Click to lock pointer) | [W/S]: Throttle | [A/D]: Roll | [V]: Toggle Camera
+      </div>
+    </div>
+    
+    <!-- Three.js Canvas container -->
+    <div id="app"></div>
+    <script type="module" src="/src/client/main.js"></script>
+  </body>
+</html>
