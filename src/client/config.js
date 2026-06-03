@@ -1,4 +1,4 @@
 export const config = {
-    // 開発用なのでlocalhost、将来的には環境変数などから取得する
-    SERVER_URL: 'ws://localhost:8080'
+    // Viteのプロキシ機能を利用して、ポート3000番経由でWebSocketに繋ぐ
+    SERVER_URL: window.location.origin
 };

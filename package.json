@@ -5,18 +5,25 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "node src/server/server.js",
+    "pm2:start": "pm2 start src/server/server.js --name airf-server",
+    "pm2:stop": "pm2 stop airf-server",
+    "pm2:logs": "pm2 logs airf-server"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "three": "^0.184.0"
   },
   "devDependencies": {
+    "pm2": "^7.0.1",
     "vite": "^8.0.16"
   }
 }

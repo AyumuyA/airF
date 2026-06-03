@@ -14,6 +14,12 @@ export class FlightController {
             throttle: 0
         };
         
+        // 射撃関連の状態
+        this.isFiring = false;
+        this.fireCooldown = 0.15; // 0.15秒に1発
+        this.timeSinceLastFire = 0;
+        this.onFire = null; // メインループ等で登録するコールバック
+        
         this.viewMode = 'TPS'; // 'TPS' or 'FPS'
         this.isPointerLocked = false;
         
@@ -54,6 +60,14 @@ export class FlightController {
                 this.input.pitch = 0;
             }
         });
+
+        // マウスの左クリックで射撃
+        window.addEventListener('mousedown', (e) => {
+            if (e.button === 0) this.isFiring = true;
+        });
+        window.addEventListener('mouseup', (e) => {
+            if (e.button === 0) this.isFiring = false;
+        });
     }
 
     onKeyDown(e) {
@@ -63,6 +77,7 @@ export class FlightController {
             case 'KeyA': this.input.roll = 1; break;   // 左ロール
             case 'KeyD': this.input.roll = -1; break;  // 右ロール
             case 'KeyV': this.toggleCamera(); break;
+            case 'Space': this.isFiring = true; break;
         }
     }
 
@@ -72,6 +87,7 @@ export class FlightController {
             case 'KeyS': this.input.throttle = 0; break;
             case 'KeyA':
             case 'KeyD': this.input.roll = 0; break;
+            case 'Space': this.isFiring = false; break;
         }
     }
 
@@ -100,6 +116,13 @@ export class FlightController {
         // 加減速の処理 (簡易的な物理)
         const targetSpeed = this.input.throttle * stats.maxSpeed;
         this.ship.currentSpeed = THREE.MathUtils.lerp(this.ship.currentSpeed, targetSpeed, delta * (stats.acceleration / stats.maxSpeed));
+        
+        // 射撃処理
+        this.timeSinceLastFire += delta;
+        if (this.isFiring && this.timeSinceLastFire >= this.fireCooldown) {
+            this.timeSinceLastFire = 0;
+            if (this.onFire) this.onFire();
+        }
         
         // クォータニオンによる回転計算 (ローカル軸)
         const pitchQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), this.input.pitch * stats.pitchSpeed);
