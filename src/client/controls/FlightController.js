@@ -77,6 +77,21 @@ export class FlightController {
 
     toggleCamera() {
         this.viewMode = this.viewMode === 'TPS' ? 'FPS' : 'TPS';
+        
+        const radarUI = document.getElementById('radar-canvas');
+
+        // 視点切り替え時、外装(exterior)と内装(interior)の表示を切り替える
+        if (this.viewMode === 'FPS') {
+            this.ship.exterior.visible = false;
+            this.ship.interior.visible = true;
+            // 3D内装モニターにレーダーを映すため、2DのHTMLレーダーは非表示にする
+            if (radarUI) radarUI.style.display = 'none';
+        } else {
+            this.ship.exterior.visible = true;
+            this.ship.interior.visible = false;
+            // TPSでは2DのHTMLレーダーを表示する
+            if (radarUI) radarUI.style.display = 'block';
+        }
     }
 
     update(delta) {

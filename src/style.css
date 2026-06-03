@@ -44,3 +44,35 @@ body {
   border-radius: 5px;
   font-size: 14px;
 }
+
+#radar-canvas {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(0, 30, 0, 0.6);
+  border: 2px solid rgba(0, 255, 0, 0.5);
+  border-radius: 50%;
+  box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+}
+
+#target-markers {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+.target-marker {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  color: #ff3333;
+  font-size: 12px;
+  font-family: monospace;
+  background: rgba(50, 0, 0, 0.6);
+  border: 1px solid #ff0000;
+  padding: 4px;
+  white-space: pre; /* 改行を有効にする */
+  display: none;
+}
