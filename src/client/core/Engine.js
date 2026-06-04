@@ -33,6 +33,9 @@ export class Engine {
         // 星屑のパーティクル
         this.createStars();
 
+        // 背景の巨大惑星
+        this.createPlanet();
+
         // リサイズハンドラ
         window.addEventListener('resize', this.onWindowResize.bind(this), false);
         
@@ -53,6 +56,39 @@ export class Engine {
         starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starsVertices, 3));
         const starField = new THREE.Points(starsGeometry, starsMaterial);
         this.scene.add(starField);
+    }
+
+    createPlanet() {
+        // 巨大なガス惑星
+        const geo = new THREE.SphereGeometry(800, 64, 64);
+        const mat = new THREE.MeshStandardMaterial({
+            color: 0x113388, // 深い青色
+            roughness: 0.7,
+            metalness: 0.2
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        // 背景として遠く（斜め下）に配置
+        mesh.position.set(-2000, -1000, -3000);
+        this.scene.add(mesh);
+
+        // 惑星のリング（輪っか）
+        const ringGeo = new THREE.RingGeometry(1000, 1600, 64);
+        const ringMat = new THREE.MeshStandardMaterial({
+            color: 0xaaaaaa,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.3
+        });
+        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+        ringMesh.position.copy(mesh.position);
+        ringMesh.rotation.x = Math.PI / 2 - 0.2; // 少し傾ける
+        ringMesh.rotation.y = 0.1;
+        this.scene.add(ringMesh);
+        
+        // 惑星専用のライト（美しく照らす）
+        const planetLight = new THREE.PointLight(0xffffff, 1.5, 5000);
+        planetLight.position.set(-1000, 0, -2000);
+        this.scene.add(planetLight);
     }
 
     add(object) {

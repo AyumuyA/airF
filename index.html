@@ -15,8 +15,71 @@
       <!-- ターゲットマーカー（HPや距離）を描画するコンテナ -->
       <div id="target-markers"></div>
 
-      <div id="controls-hint">
-        [Mouse]: Pitch/Yaw (Click to lock pointer) | [W/S]: Throttle | [A/D]: Roll | [V]: Toggle Camera
+      <!-- キルログ表示エリア -->
+      <div id="kill-log"></div>
+
+      <!-- メニューオーバーレイ -->
+      <div id="game-menu">
+        <div class="menu-container">
+          <h1 class="menu-title">AIR FIGHTER</h1>
+          <div class="menu-tabs">
+            <button class="tab-btn active" data-target="tab-controls">操作方法</button>
+            <button class="tab-btn" data-target="tab-match">マッチ</button>
+            <button class="tab-btn" data-target="tab-profile">プロフィール</button>
+            <button class="tab-btn" data-target="tab-players">プレイヤー</button>
+            <button class="tab-btn" data-target="tab-settings">設定</button>
+          </div>
+          <div class="menu-content">
+            <!-- 操作方法 -->
+            <div id="tab-controls" class="tab-pane active">
+              <h2>操作方法</h2>
+              <ul>
+                <li><strong>マウス移動:</strong> 旋回（ピッチ/ヨー）</li>
+                <li><strong>左クリック:</strong> 通常レーザー発射</li>
+                <li><strong>右クリック:</strong> ミサイル発射 (TPS) / ロックオン (FPS)</li>
+                <li><strong>W / S:</strong> スロットル（加減速）</li>
+                <li><strong>A / D:</strong> ロール（傾き） ※ダブルタップでバレルロール回避</li>
+                <li><strong>Shift (長押し):</strong> 仮想ジョイスティックモード</li>
+                <li><strong>Space (長押し):</strong> 後方視点</li>
+                <li><strong>V:</strong> 視点切替 (TPS / FPS)</li>
+                <li><strong>Esc:</strong> メニューを開く / 閉じる</li>
+              </ul>
+            </div>
+            <!-- マッチ -->
+            <div id="tab-match" class="tab-pane hidden">
+              <h2>マッチメイク</h2>
+              <p>現在はロビー（待機場）です。</p>
+              <button id="btn-create-match" disabled>ルーム作成 (Coming Soon)</button>
+              <button id="btn-join-match" disabled>ルーム参加 (Coming Soon)</button>
+            </div>
+            <!-- プロフィール -->
+            <div id="tab-profile" class="tab-pane hidden">
+              <h2>プロフィール</h2>
+              <div class="input-group">
+                <label for="player-name-input">プレイヤー名:</label>
+                <input type="text" id="player-name-input" placeholder="Pilot Name" maxlength="15" />
+                <button id="btn-save-name">変更</button>
+              </div>
+            </div>
+            <!-- プレイヤー一覧 -->
+            <div id="tab-players" class="tab-pane hidden">
+              <h2>オンラインプレイヤー</h2>
+              <ul id="player-list">
+                <!-- 動的に生成 -->
+              </ul>
+            </div>
+            <!-- 設定 -->
+            <div id="tab-settings" class="tab-pane hidden">
+              <h2>設定</h2>
+              <div class="input-group">
+                <label for="reticle-color-picker">レティクル（照準）の色:</label>
+                <input type="color" id="reticle-color-picker" value="#00ffff" />
+              </div>
+              <p class="setting-desc">※色覚特性に合わせて見やすい色に変更できます。</p>
+            </div>
+          </div>
+          <button id="btn-close-menu">ゲームに戻る (Esc)</button>
+        </div>
       </div>
     </div>
     
