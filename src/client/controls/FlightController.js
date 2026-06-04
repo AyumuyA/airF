@@ -6,6 +6,8 @@ export class FlightController {
         this.camera = camera;
         this.domElement = domElement;
         
+        this.enabled = true; // 操作可能かどうか
+        
         // 入力状態
         this.input = {
             pitchBuffer: 0,
@@ -74,47 +76,62 @@ export class FlightController {
         });
         
         // マウス移動
-        document.addEventListener('mousemove', (e) => {
-            if (this.isPointerLocked) {
-                if (this.virtualStick.active) {
-                    // シフト押下中：マウス移動をレバーの傾きとして蓄積する
-                    this.virtualStick.x += -e.movementX * this.mouseSensitivityX;
-                    this.virtualStick.y += -e.movementY * this.mouseSensitivityY;
-                    
-                    // レバーが倒れすぎないように最大値を設ける（-1.0 ~ 1.0を限界とする）
-                    this.virtualStick.x = THREE.MathUtils.clamp(this.virtualStick.x, -1.5, 1.5);
-                    this.virtualStick.y = THREE.MathUtils.clamp(this.virtualStick.y, -1.5, 1.5);
-                } else {
-                    // 通常時：マウス入力を直接バッファに蓄積する
-                    // 下方向（e.movementY > 0）の感度をさらに少し良くする
-                    const ySens = e.movementY > 0 ? this.mouseSensitivityY * 1.2 : this.mouseSensitivityY;
-                    this.input.yawBuffer += -e.movementX * this.mouseSensitivityX;
-                    this.input.pitchBuffer += -e.movementY * ySens;
-                }
-            }
-        });
+        document.addEventListener('mousemove', (e) => this.onMouseMove(e));
 
         // マウスの左クリックで通常弾、右クリックでミサイル構え・発射
-        window.addEventListener('mousedown', (e) => {
-            if (e.button === 0) this.isFiring = true;
-            if (e.button === 2) {
-                this.isAiming = true;
-                if (this.onMissileTrigger) this.onMissileTrigger(true);
-            }
-        });
-        window.addEventListener('mouseup', (e) => {
-            if (e.button === 0) this.isFiring = false;
-            if (e.button === 2) {
-                this.isAiming = false;
-                if (this.onMissileTrigger) this.onMissileTrigger(false);
-            }
-        });
+        window.addEventListener('mousedown', (e) => this.onMouseDown(e));
+        window.addEventListener('mouseup', (e) => this.onMouseUp(e));
         
         // 右クリックメニュー禁止
         window.addEventListener('contextmenu', e => e.preventDefault());
     }
 
+    onMouseDown(e) {
+        if (!this.enabled) return;
+        if (document.pointerLockElement !== this.domElement) return;
+        if (e.button === 0) this.isFiring = true;
+        if (e.button === 2) {
+            if (this.viewMode === 'FPS') {
+                this.isAiming = true;
+            } else if (this.onMissileTrigger) {
+                this.onMissileTrigger(true);
+            }
+        }
+    }
+
+    onMouseUp(e) {
+        if (!this.enabled) return;
+        if (e.button === 0) this.isFiring = false;
+        if (e.button === 2) {
+            if (this.viewMode === 'FPS') {
+                this.isAiming = false;
+                if (this.onMissileTrigger) this.onMissileTrigger(false);
+            }
+        }
+    }
+
+    onMouseMove(e) {
+        if (!this.enabled) return;
+        if (document.pointerLockElement !== this.domElement) return;
+        if (this.virtualStick.active) {
+            // シフト押下中：マウス移動をレバーの傾きとして蓄積する
+            this.virtualStick.x += -e.movementX * this.mouseSensitivityX;
+            this.virtualStick.y += -e.movementY * this.mouseSensitivityY;
+            
+            // レバーが倒れすぎないように最大値を設ける（-1.0 ~ 1.0を限界とする）
+            this.virtualStick.x = THREE.MathUtils.clamp(this.virtualStick.x, -1.5, 1.5);
+            this.virtualStick.y = THREE.MathUtils.clamp(this.virtualStick.y, -1.5, 1.5);
+        } else {
+            // 通常時：マウス入力を直接バッファに蓄積する
+            // 下方向（e.movementY > 0）の感度をさらに少し良くする
+            const ySens = e.movementY > 0 ? this.mouseSensitivityY * 1.2 : this.mouseSensitivityY;
+            this.input.yawBuffer += -e.movementX * this.mouseSensitivityX;
+            this.input.pitchBuffer += -e.movementY * ySens;
+        }
+    }
+
     onKeyDown(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         if (e.repeat) return;
         switch(e.code) {
             case 'ShiftLeft':
@@ -129,7 +146,7 @@ export class FlightController {
             case 'KeyS': this.input.throttle = -0.5; break; // 減速・後退
             case 'KeyA': 
                 const nowA = performance.now();
-                if (nowA - this.lastTapTime.a < 300 && !this.barrelRoll.active) {
+                if (this.enabled && nowA - this.lastTapTime.a < 300 && !this.barrelRoll.active) {
                     this.barrelRoll = { active: true, progress: 0, duration: 0.4, direction: 1 };
                 }
                 this.lastTapTime.a = nowA;
@@ -137,13 +154,15 @@ export class FlightController {
                 break;
             case 'KeyD':
                 const nowD = performance.now();
-                if (nowD - this.lastTapTime.d < 300 && !this.barrelRoll.active) {
+                if (this.enabled && nowD - this.lastTapTime.d < 300 && !this.barrelRoll.active) {
                     this.barrelRoll = { active: true, progress: 0, duration: 0.4, direction: -1 };
                 }
                 this.lastTapTime.d = nowD;
                 this.input.roll = -1; 
                 break;
-            case 'KeyV': this.toggleCamera(); break;
+            case 'KeyV': 
+                if (this.enabled) this.toggleCamera(); 
+                break;
             case 'Space': this.input.rearView = true; break;
         }
     }
@@ -157,7 +176,11 @@ export class FlightController {
                 this.virtualStick.y = 0;
                 break;
             case 'KeyW':
-            case 'KeyS': this.input.throttle = 0; break;
+                if (this.input.throttle > 0) this.input.throttle = 0;
+                break;
+            case 'KeyS': 
+                if (this.input.throttle < 0) this.input.throttle = 0; 
+                break;
             case 'KeyA':
             case 'KeyD': this.input.roll = 0; break;
             case 'Space': this.input.rearView = false; break;
@@ -188,6 +211,8 @@ export class FlightController {
     }
 
     update(delta) {
+        if (!this.enabled) return;
+
         const stats = this.ship.stats;
         
         // 加減速の処理 (慣性とブレーキ)
@@ -203,8 +228,8 @@ export class FlightController {
         }
         
         // 慣性の影響：スピードが速いほど旋回しにくくなる（最大で旋回速度が半減）
-        const speedRatio = this.ship.currentSpeed / stats.maxSpeed;
-        const inertiaFactor = 1.0 - (speedRatio * 0.5); 
+        const speedRatioForInertia = Math.min(1.0, this.ship.currentSpeed / stats.maxSpeed);
+        const inertiaFactor = 1.0 - (speedRatioForInertia * 0.5); 
         
         // 射撃処理
         this.timeSinceLastFire += delta;
@@ -359,10 +384,10 @@ export class FlightController {
             }
         }
 
-        // 速度に応じたFOV（視野角）の変更によるスピード感の演出（FPS視点では控えめにする）
-        const speedRatio = this.ship.currentSpeed / this.ship.stats.maxSpeed;
-        const maxFovIncrease = this.viewMode === 'TPS' ? 35 : 5; // コックピット内のUIサイズ変動を抑えるためFPSではほぼ固定
-        const targetFov = 75 + (speedRatio * maxFovIncrease);
+        // 速度に応じたFOV（視野角）の変更によるスピード感の演出
+        const fovSpeedRatio = Math.min(1.5, this.ship.currentSpeed / this.ship.stats.maxSpeed);
+        const maxFovIncrease = this.viewMode === 'TPS' ? (this.ship.isRaceMode ? 60 : 35) : 5; 
+        const targetFov = Math.min(130, 75 + (fovSpeedRatio * maxFovIncrease));
         this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, 0.1);
         this.camera.updateProjectionMatrix();
     }

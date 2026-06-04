@@ -24,8 +24,41 @@ window.onload = () => {
     const reticleColorPicker = document.getElementById('reticle-color-picker');
     const crosshair = document.getElementById('crosshair');
 
+    // マッチメイクUI
+    const roomListContainer = document.getElementById('room-list-container');
+    const roomLobbyContainer = document.getElementById('room-lobby-container');
+    const roomListUI = document.getElementById('room-list');
+    const roomNameInput = document.getElementById('room-name-input');
+    const btnCreateRoom = document.getElementById('btn-create-room');
+    const btnLeaveRoom = document.getElementById('btn-leave-room');
+    const btnStartMatch = document.getElementById('btn-start-match');
+    const roomParticipants = document.getElementById('room-participants');
+    const currentRoomName = document.getElementById('current-room-name');
+    
+    // マッチ中HUD
+    const matchHud = document.getElementById('match-hud');
+    const matchTimer = document.getElementById('match-timer');
+    const matchScoreList = document.getElementById('match-score-list');
+    const matchResultScreen = document.getElementById('match-result-screen');
+    const matchWinnerName = document.getElementById('match-winner-name');
+    const resultScoreList = document.getElementById('result-score-list');
+    const hostControls = document.getElementById('host-controls');
+    const guestControls = document.getElementById('guest-controls');
+    const btnRematch = document.getElementById('btn-rematch');
+    const btnChangeRules = document.getElementById('btn-change-rules');
+    const btnLeaveMatch = document.getElementById('btn-leave-match');
+    const matchCountdownScreen = document.getElementById('match-countdown-screen');
+    const matchCountdownText = document.getElementById('match-countdown-text');
+
     let localPlayerName = "Pilot_" + Math.floor(Math.random() * 1000);
     nameInput.value = localPlayerName;
+    
+    // マッチメイク状態
+    let currentRoomId = null;
+    let isHost = false;
+    let isMatchActive = false;
+    let isCountdown = false;
+    let matchEndTime = 0;
     
     // 他のプレイヤーやオブジェクトを管理するコレクション
     const remotePlayers = {};
@@ -243,6 +276,48 @@ window.onload = () => {
         crosshair.style.color = color;
     });
 
+    // --- マッチメイク関連UIイベント ---
+    btnCreateRoom.addEventListener('click', () => {
+        const name = roomNameInput.value.trim();
+        network.createRoom(name);
+    });
+
+    btnLeaveRoom.addEventListener('click', () => {
+        if (currentRoomId) network.leaveRoom(currentRoomId);
+        currentRoomId = null;
+        isHost = false;
+        roomListContainer.classList.remove('hidden');
+        roomLobbyContainer.classList.add('hidden');
+    });
+
+    btnStartMatch.addEventListener('click', () => {
+        if (currentRoomId && isHost) {
+            network.startMatch(currentRoomId);
+        }
+    });
+
+    btnRematch.addEventListener('click', () => {
+        if (currentRoomId && isHost) network.rematch(currentRoomId);
+    });
+
+    btnChangeRules.addEventListener('click', () => {
+        if (currentRoomId && isHost) network.returnToRoomMenu(currentRoomId);
+    });
+
+    btnLeaveMatch.addEventListener('click', () => {
+        if (currentRoomId) {
+            network.leaveMatch(currentRoomId);
+        }
+    });
+
+    const gameModeSelect = document.getElementById('game-mode-select');
+
+    gameModeSelect.addEventListener('change', (e) => {
+        if (currentRoomId && isHost) {
+            network.changeGameMode(currentRoomId, e.target.value);
+        }
+    });
+
     // ネットワーク初期化後の更新
     network.onNameUpdate = (data) => {
         if (remotePlayers[data.id]) {
@@ -251,12 +326,712 @@ window.onload = () => {
             updatePlayerListUI();
         }
     };
+    
+    // --- ネットワーク受信処理 (Matchmaking) ---
+    network.onRoomListUpdate = (pendingMatches) => {
+        roomListUI.innerHTML = '';
+        
+        let myRoom = null;
+        for (const roomId in pendingMatches) {
+            if (pendingMatches[roomId].players.includes(playerShip.id)) {
+                myRoom = pendingMatches[roomId];
+                currentRoomId = roomId;
+                break;
+            }
+        }
+
+        if (myRoom) {
+            // ルーム待機中
+            roomListContainer.classList.add('hidden');
+            roomLobbyContainer.classList.remove('hidden');
+            currentRoomName.innerText = myRoom.name;
+            
+            isHost = (myRoom.hostId === playerShip.id);
+            if (isHost) {
+                btnStartMatch.classList.remove('hidden');
+                gameModeSelect.disabled = false;
+            } else {
+                btnStartMatch.classList.add('hidden');
+                gameModeSelect.disabled = true;
+            }
+            
+            gameModeSelect.value = myRoom.gameMode || 'ffa';
+            
+            roomParticipants.innerHTML = '';
+            myRoom.players.forEach(pid => {
+                const li = document.createElement('li');
+                let pName = "Unknown";
+                if (pid === playerShip.id) pName = playerShip.displayName || localPlayerName;
+                else if (remotePlayers[pid]) pName = remotePlayers[pid].displayName || remotePlayers[pid].playerName || `Pilot_${pid.substring(0,4)}`;
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.innerText = pid === myRoom.hostId ? `👑 ${pName}` : pName;
+                li.appendChild(nameSpan);
+                
+                if (myRoom.gameMode === 'tdm') {
+                    const teamSpan = document.createElement('span');
+                    teamSpan.style.marginLeft = '15px';
+                    
+                    if (pid === playerShip.id) {
+                        const select = document.createElement('select');
+                        select.innerHTML = `
+                            <option value="auto">Auto</option>
+                            <option value="red">Red Team</option>
+                            <option value="blue">Blue Team</option>
+                        `;
+                        select.value = myRoom.teams[pid] || 'auto';
+                        select.onchange = (e) => network.changeTeam(myRoom.id, e.target.value);
+                        teamSpan.appendChild(select);
+                    } else {
+                        const teamStr = myRoom.teams[pid] || 'auto';
+                        teamSpan.innerText = `[${teamStr.toUpperCase()}]`;
+                        if (teamStr === 'red') teamSpan.style.color = '#ff4444';
+                        else if (teamStr === 'blue') teamSpan.style.color = '#33b5e5';
+                    }
+                    li.appendChild(teamSpan);
+                }
+                
+                roomParticipants.appendChild(li);
+            });
+        } else {
+            // ロビー
+            currentRoomId = null;
+            isHost = false;
+            roomListContainer.classList.remove('hidden');
+            roomLobbyContainer.classList.add('hidden');
+            
+            for (const roomId in pendingMatches) {
+                const room = pendingMatches[roomId];
+                const li = document.createElement('li');
+                
+                const info = document.createElement('span');
+                info.innerText = `${room.name} (${room.players.length}人)`;
+                li.appendChild(info);
+                
+                const btn = document.createElement('button');
+                btn.className = 'btn-join-room';
+                btn.innerText = '参加';
+                btn.onclick = () => { network.joinRoom(roomId); };
+                li.appendChild(btn);
+                
+                roomListUI.appendChild(li);
+            }
+        }
+    };
+    let currentGameMode = 'ffa';
+    let currentTeams = {};
+    
+    // Racing Mode Globals
+    let raceCheckpoints = [];
+    let raceCheckpointsMeshes = [];
+    let currentRaceProgress = {};
+    const raceHud = document.getElementById('race-hud');
+    const raceLapText = document.getElementById('race-lap');
+    const raceRankText = document.getElementById('race-rank');
+    const scoreBoard = document.getElementById('match-scoreboard');
+    
+    network.onMatchStarted = (data) => {
+        isMatchActive = true;
+        matchEndTime = Date.now() + data.timeLimitMs + data.countdownMs;
+        currentRoomId = data.matchId;
+        isCountdown = true;
+        
+        currentGameMode = data.gameMode || 'ffa';
+        currentTeams = data.teams || {};
+        
+        if (currentGameMode === 'race' && data.checkpoints) {
+            playerShip.isRaceMode = true;
+            playerShip.stats.maxSpeed = playerShip.originalStats.maxSpeed * 3.0;
+            playerShip.stats.acceleration = playerShip.originalStats.acceleration * 2.5;
+
+            raceCheckpoints = data.checkpoints;
+            createRaceCheckpoints();
+            createRaceObstacles(data.raceObstacles);
+            raceHud.classList.remove('hidden');
+            scoreBoard.classList.add('hidden');
+            
+            for (const pid in data.players) {
+                currentRaceProgress[pid] = { lap: 1, currentCheckpoint: 0 };
+            }
+            updateRaceHUD();
+        } else {
+            playerShip.isRaceMode = false;
+            playerShip.stats.maxSpeed = playerShip.originalStats.maxSpeed;
+            playerShip.stats.acceleration = playerShip.originalStats.acceleration;
+
+            removeRaceCheckpoints();
+            raceHud.classList.add('hidden');
+            scoreBoard.classList.remove('hidden');
+        }
+        
+        // UIの切り替え
+        menuOverlay.classList.add('hidden');
+        matchHud.classList.remove('hidden');
+        matchResultScreen.classList.add('hidden');
+        matchCountdownScreen.classList.remove('hidden');
+        engine.renderer.domElement.requestPointerLock();
+        
+        flightController.enabled = false;
+
+        // カウントダウン処理
+        let count = Math.floor(data.countdownMs / 1000);
+        let raceWPressTime = null;
+        let raceStartTime = Date.now() + data.countdownMs;
+        
+        const crosshair = document.getElementById('crosshair');
+        const radarCanvas = document.getElementById('radar-canvas');
+        const targetMarkers = document.getElementById('target-markers');
+
+        if (currentGameMode === 'race' && count >= 5) {
+            matchCountdownText.innerText = "READY";
+            matchHud.style.opacity = '0'; // Hide HUD for clear view
+            if(crosshair) crosshair.style.opacity = '0';
+            if(radarCanvas) radarCanvas.style.opacity = '0';
+            if(targetMarkers) targetMarkers.style.opacity = '0';
+        } else {
+            matchCountdownText.innerText = count;
+        }
+        matchCountdownText.style.color = "white";
+
+        const raceKeydownHandler = (e) => {
+            if ((e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp')) {
+                if (isCountdown && !raceWPressTime) {
+                    raceWPressTime = Date.now();
+                }
+            }
+        };
+        if (currentGameMode === 'race') {
+            document.addEventListener('keydown', raceKeydownHandler);
+        }
+
+        const countInterval = setInterval(() => {
+            count--;
+            if (count > 3 && currentGameMode === 'race') {
+                matchCountdownText.innerText = "READY";
+            } else if (count > 0) {
+                if (currentGameMode === 'race' && count === 3) {
+                    // Show HUD again
+                    matchHud.style.opacity = '1';
+                    if(crosshair) crosshair.style.opacity = '1';
+                    if(radarCanvas) radarCanvas.style.opacity = '1';
+                    if(targetMarkers) targetMarkers.style.opacity = '1';
+                }
+                matchCountdownText.innerText = count;
+            } else if (count === 0) {
+                matchCountdownText.innerText = "START!";
+                flightController.enabled = true;
+                
+                if (currentGameMode === 'race') {
+                    // Ensure HUD is visible if somehow it was missed
+                    matchHud.style.opacity = '1';
+                    if(crosshair) crosshair.style.opacity = '1';
+                    if(radarCanvas) radarCanvas.style.opacity = '1';
+                    if(targetMarkers) targetMarkers.style.opacity = '1';
+
+                    if (raceWPressTime) {
+                        const earlyMs = raceStartTime - raceWPressTime;
+                        if (earlyMs > 2000) {
+                            // 早すぎ＝クラッシュ
+                            flightController.enabled = false;
+                            playerShip.currentSpeed = 0;
+                            matchCountdownText.innerText = "CRASH!";
+                            matchCountdownText.style.color = "red";
+                            setTimeout(() => { flightController.enabled = true; }, 1500);
+                        } else if (earlyMs <= 2000 && earlyMs >= 1500) {
+                            // 完璧＝スタートダッシュ
+                            playerShip.currentSpeed = 2000;
+                            matchCountdownText.innerText = "PERFECT DASH!!";
+                            matchCountdownText.style.color = "gold";
+                        } else if (earlyMs < 1500 && earlyMs >= 1000) {
+                            // 普通のダッシュ
+                            playerShip.currentSpeed = 1200;
+                            matchCountdownText.innerText = "DASH!";
+                            matchCountdownText.style.color = "orange";
+                        } else if (earlyMs < 1000 && earlyMs >= 0) {
+                            // ミニダッシュ
+                            playerShip.currentSpeed = 700;
+                            matchCountdownText.innerText = "MINI DASH!";
+                            matchCountdownText.style.color = "yellow";
+                        }
+                    }
+                }
+            } else {
+                clearInterval(countInterval);
+                if (currentGameMode === 'race') document.removeEventListener('keydown', raceKeydownHandler);
+                matchCountdownScreen.classList.add('hidden');
+                isCountdown = false;
+            }
+        }, 1000);
+        
+        // ロビーにいた他のプレイヤーを消去
+        for (const pid in remotePlayers) {
+            engine.scene.remove(remotePlayers[pid].mesh);
+        }
+        for (let key in remotePlayers) delete remotePlayers[key];
+        enemyListForUI.length = 0;
+        
+        // マッチの初期状態を反映
+        for (const pid in data.players) {
+            let targetMesh = null;
+            if (pid === playerShip.id) {
+                playerShip.mesh.position.copy(data.players[pid].position);
+                playerShip.hp = 100;
+                playerShip.mesh.visible = true;
+                targetMesh = playerShip.mesh;
+            } else {
+                const pInfo = data.players[pid];
+                const enemy = new Ship('TYPE_C', pInfo.id, true);
+                enemy.interior.visible = false;
+                enemy.hp = pInfo.hp;
+                enemy.playerName = pInfo.playerName || `Pilot_${pInfo.id.substring(0, 4)}`;
+                enemy.mesh.position.copy(pInfo.position);
+                enemy.mesh.quaternion.copy(pInfo.quaternion);
+                engine.add(enemy.mesh);
+                
+                remotePlayers[pInfo.id] = enemy;
+                enemyListForUI.push(enemy);
+                targetMesh = enemy.mesh;
+            }
+            
+            if (currentGameMode === 'race' && raceCheckpointsMeshes.length > 0 && targetMesh) {
+                targetMesh.lookAt(new THREE.Vector3(targetMesh.position.x, targetMesh.position.y, targetMesh.position.z - 1000));
+            }
+            
+            if (currentGameMode === 'tdm') {
+                const team = currentTeams[pid];
+                if (pid !== playerShip.id && remotePlayers[pid]) {
+                    remotePlayers[pid].isEnemy = (currentTeams[playerShip.id] !== team);
+                    remotePlayers[pid].teamColor = (team === 'red') ? '#ff4444' : '#33b5e5';
+                }
+                
+                if (targetMesh && team) {
+                    targetMesh.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            child.material = child.material.clone();
+                            if (team === 'red') child.material.color.setHex(0xffaaaa);
+                            else if (team === 'blue') child.material.color.setHex(0x33b5e5);
+                        }
+                    });
+                }
+            } else {
+                if (pid !== playerShip.id && remotePlayers[pid]) {
+                    remotePlayers[pid].isEnemy = true;
+                    remotePlayers[pid].teamColor = null;
+                }
+            }
+        }
+        updateDisplayNames();
+        updateMatchScoreUI({ scores: {}, gameMode: currentGameMode, teamScores: {red: 0, blue: 0} }); // reset
+    };
+    
+    network.onMatchScoreUpdate = (data) => {
+        updateMatchScoreUI(data);
+    };
+    
+    network.onMatchEnded = (data) => {
+        isMatchActive = false;
+        document.exitPointerLock(); // マウスを使えるようにする
+        
+        flightController.enabled = false;
+        playerShip.currentSpeed = 0;
+        
+        if (data.gameMode === 'race') {
+            removeRaceCheckpoints();
+        }
+
+        matchResultScreen.classList.remove('hidden');
+        matchHud.classList.add('hidden');
+        
+        let winnerName = "DRAW";
+        if (data.gameMode === 'tdm') {
+            if (data.winnerId === 'red') winnerName = "RED TEAM WINS!";
+            else if (data.winnerId === 'blue') winnerName = "BLUE TEAM WINS!";
+        } else {
+            if (data.winnerId === playerShip.id) winnerName = playerShip.displayName || localPlayerName;
+            else if (remotePlayers[data.winnerId]) winnerName = remotePlayers[data.winnerId].displayName || remotePlayers[data.winnerId].playerName || `Pilot_${data.winnerId.substring(0,4)}`;
+        }
+        matchWinnerName.innerText = winnerName;
+
+        // リザルトのスコアリストを作成
+        resultScoreList.innerHTML = '';
+        if (data.gameMode === 'race' && data.raceProgress) {
+            const sorted = Object.keys(data.raceProgress).map(id => {
+                const p = data.raceProgress[id];
+                return { id, score: p.lap * 100 + p.currentCheckpoint, lap: p.lap, cp: p.currentCheckpoint };
+            }).sort((a,b) => b.score - a.score);
+            
+            sorted.forEach((entry, idx) => {
+                const li = document.createElement('li');
+                let pName = "Unknown";
+                if (entry.id === playerShip.id) pName = playerShip.displayName || localPlayerName;
+                else if (remotePlayers[entry.id]) pName = remotePlayers[entry.id].displayName || remotePlayers[entry.id].playerName || `Pilot_${entry.id.substring(0,4)}`;
+                
+                const totalRings = raceCheckpoints.length * 3;
+                const passedRings = Math.min((entry.lap - 1) * raceCheckpoints.length + entry.cp, totalRings);
+                li.innerHTML = `<span>${idx + 1}位: ${pName}</span><span>Rings: ${passedRings} / ${totalRings}</span>`;
+                if (entry.id === playerShip.id) li.style.color = '#00ffcc';
+                resultScoreList.appendChild(li);
+            });
+        } else if (data.scores) {
+            if (data.gameMode === 'tdm' && data.teamScores) {
+                const liRed = document.createElement('li');
+                liRed.innerHTML = `<span style="color:#ff4444;">RED TEAM</span><span>${data.teamScores.red || 0} Kills</span>`;
+                resultScoreList.appendChild(liRed);
+                const liBlue = document.createElement('li');
+                liBlue.innerHTML = `<span style="color:#33b5e5;">BLUE TEAM</span><span>${data.teamScores.blue || 0} Kills</span>`;
+                resultScoreList.appendChild(liBlue);
+            }
+
+            const sorted = Object.keys(data.scores).map(id => ({ id, score: data.scores[id] })).sort((a,b) => b.score - a.score);
+            sorted.forEach(entry => {
+                const li = document.createElement('li');
+                let pName = "Unknown";
+                if (entry.id === playerShip.id) pName = playerShip.displayName || localPlayerName;
+                else if (remotePlayers[entry.id]) pName = remotePlayers[entry.id].displayName || remotePlayers[entry.id].playerName || `Pilot_${entry.id.substring(0,4)}`;
+                
+                let teamStr = "";
+                if (data.gameMode === 'tdm' && currentTeams[entry.id]) {
+                    teamStr = ` [${currentTeams[entry.id].toUpperCase()}]`;
+                }
+
+                li.innerHTML = `<span>${pName}${teamStr}</span><span>${entry.score} Kills</span>`;
+                if (entry.id === playerShip.id) li.style.color = '#00ffcc';
+                else if (data.gameMode === 'tdm' && currentTeams[entry.id] === 'red') li.style.color = '#ffaaaa';
+                else if (data.gameMode === 'tdm' && currentTeams[entry.id] === 'blue') li.style.color = '#33b5e5';
+                
+                resultScoreList.appendChild(li);
+            });
+        }
+
+        // ホスト/ゲストのボタン表示切替
+        isHost = (data.hostId === network.socket.id);
+        if (isHost) {
+            hostControls.classList.remove('hidden');
+            guestControls.classList.add('hidden');
+        } else {
+            hostControls.classList.add('hidden');
+            guestControls.classList.remove('hidden');
+        }
+    };
+    
+    network.onReturnedToLobby = () => {
+        matchResultScreen.classList.add('hidden');
+        menuOverlay.classList.remove('hidden');
+        isMatchActive = false;
+        currentRoomId = null;
+        isHost = false;
+        
+        // delete all players before receiving currentPlayers
+        for (const pid in remotePlayers) {
+            engine.scene.remove(remotePlayers[pid].mesh);
+        }
+        for (let key in remotePlayers) delete remotePlayers[key];
+        enemyListForUI.length = 0;
+    };
+
+    network.onReturnedToRoomMenu = (roomId) => {
+        matchResultScreen.classList.add('hidden');
+        menuOverlay.classList.remove('hidden');
+        isMatchActive = false;
+        
+        for (const pid in remotePlayers) {
+            engine.scene.remove(remotePlayers[pid].mesh);
+        }
+        for (let key in remotePlayers) delete remotePlayers[key];
+        enemyListForUI.length = 0;
+        
+        // 部屋のメニューに戻る
+        roomLobbyContainer.classList.remove('hidden');
+        roomListContainer.classList.add('hidden');
+        currentRoomName.innerText = "Rematch Room";
+    };
+
+    network.onHostMigrated = (newHostId) => {
+        if (newHostId === network.socket.id) {
+            isHost = true;
+            if (!matchResultScreen.classList.contains('hidden')) {
+                hostControls.classList.remove('hidden');
+                guestControls.classList.add('hidden');
+            }
+        }
+    };
+    network.onRaceProgressUpdate = (progressMap) => {
+        currentRaceProgress = progressMap;
+        updateRaceHUD();
+    };
+
+    let raceStartLineMesh = null;
+    let raceObstaclesMeshes = [];
+    let raceObstaclesData = [];
+
+    function createRaceCheckpoints() {
+        removeRaceCheckpoints();
+        raceCheckpoints.forEach((cp, index) => {
+            const geo = new THREE.TorusGeometry(cp.radius, 15, 16, 64);
+            const mat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.2 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.copy(cp.position);
+            
+            const nextCp = raceCheckpoints[(index + 1) % raceCheckpoints.length];
+            mesh.lookAt(new THREE.Vector3(nextCp.position.x, nextCp.position.y, nextCp.position.z));
+            
+            engine.add(mesh);
+            raceCheckpointsMeshes.push(mesh);
+        });
+        updateRaceCheckpointColors(0);
+
+        if (!raceStartLineMesh) {
+            const lineGeo = new THREE.PlaneGeometry(1200, 50);
+            const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+            raceStartLineMesh = new THREE.Mesh(lineGeo, lineMat);
+            raceStartLineMesh.position.set(0, -20, -1000);
+            raceStartLineMesh.rotation.x = -Math.PI / 2;
+            engine.add(raceStartLineMesh);
+        }
+    }
+
+    function createRaceObstacles(obstacles) {
+        if (!obstacles) return;
+        raceObstaclesData = obstacles;
+        obstacles.forEach(obs => {
+            let geo, mat, mesh;
+            if (obs.type === 'station') {
+                geo = new THREE.TorusGeometry(obs.radius, obs.radius * 0.2, 16, 64);
+                // 宇宙ステーションは白やシルバーを基調にし、少し発光させる
+                mat = new THREE.MeshStandardMaterial({ 
+                    color: 0xffffff, 
+                    metalness: 0.9, 
+                    roughness: 0.1,
+                    emissive: 0x222244,
+                    emissiveIntensity: 0.8
+                });
+                mesh = new THREE.Mesh(geo, mat);
+                const hubGeo = new THREE.CylinderGeometry(obs.radius * 0.4, obs.radius * 0.4, obs.radius * 0.6, 16);
+                
+                // ハブ部分は少し色を変えてカラフルに（青系など）
+                const hubMat = new THREE.MeshStandardMaterial({
+                    color: 0xaaaaaa,
+                    emissive: 0x0088ff,
+                    emissiveIntensity: 0.5,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+                const hubMesh = new THREE.Mesh(hubGeo, hubMat);
+                mesh.add(hubMesh);
+            } else if (obs.type === 'ship') {
+                geo = new THREE.ConeGeometry(obs.radius * 0.4, obs.radius * 2, 32);
+                // 宇宙船はビビッドな色（赤、オレンジ、緑など）をランダムに
+                const colors = [0xff4444, 0xff8800, 0x44ff44, 0x9933ff, 0xffffff];
+                const shipColor = colors[Math.floor(Math.random() * colors.length)];
+                mat = new THREE.MeshStandardMaterial({ 
+                    color: shipColor, 
+                    metalness: 0.9, 
+                    roughness: 0.3,
+                    emissive: shipColor,
+                    emissiveIntensity: 0.3
+                });
+                mesh = new THREE.Mesh(geo, mat);
+                mesh.rotation.x = Math.PI / 2; // Point forward
+            } else {
+                geo = new THREE.IcosahedronGeometry(obs.radius, 1);
+                // 小惑星ではなく「エネルギー機雷」のような見た目にして差別化する
+                const mineColors = [0xff00ff, 0x00ffff, 0xffff00, 0x00ff00, 0xff0000];
+                const mColor = mineColors[Math.floor(Math.random() * mineColors.length)];
+                mat = new THREE.MeshStandardMaterial({ 
+                    color: mColor, 
+                    roughness: 0.2, 
+                    metalness: 0.8,
+                    emissive: mColor,
+                    emissiveIntensity: 0.6
+                });
+                mesh = new THREE.Mesh(geo, mat);
+            }
+            
+            mesh.position.copy(obs.position);
+            mesh.rotation.set(obs.rotation.x, obs.rotation.y, obs.rotation.z);
+            engine.add(mesh);
+            raceObstaclesMeshes.push(mesh);
+        });
+    }
+
+    function removeRaceCheckpoints() {
+        raceCheckpointsMeshes.forEach(mesh => engine.scene.remove(mesh));
+        raceCheckpointsMeshes = [];
+        if (raceStartLineMesh) {
+            engine.scene.remove(raceStartLineMesh);
+            raceStartLineMesh = null;
+        }
+        raceObstaclesMeshes.forEach(mesh => engine.scene.remove(mesh));
+        raceObstaclesMeshes = [];
+        raceObstaclesData = [];
+    }
+
+    function updateRaceCheckpointColors(currentIdx) {
+        raceCheckpointsMeshes.forEach((mesh, index) => {
+            if (index === currentIdx) {
+                mesh.material.color.setHex(0x00ff00);
+                mesh.material.opacity = 0.8;
+                mesh.visible = true;
+            } else if (index > currentIdx || (currentIdx === raceCheckpoints.length - 1 && index === 0)) {
+                mesh.material.color.setHex(0x0000ff);
+                mesh.material.opacity = 0.2;
+                mesh.visible = true;
+            } else {
+                mesh.visible = false;
+            }
+        });
+    }
+
+    function updateRaceHUD() {
+        const myProg = currentRaceProgress[playerShip.id];
+        if (!myProg) return;
+
+        const totalRings = raceCheckpoints.length * 3;
+        const passedRings = (myProg.lap - 1) * raceCheckpoints.length + myProg.currentCheckpoint;
+        const displayRing = Math.min(passedRings + 1, totalRings);
+        
+        raceLapText.innerText = `RING ${displayRing} / ${totalRings}`;
+
+        // 次のCPへの距離を計算してスコアのタイブレークにする
+        const myNextCp = raceCheckpoints[myProg.currentCheckpoint % raceCheckpoints.length];
+        const myDist = myNextCp ? playerShip.mesh.position.distanceTo(myNextCp.position) : 0;
+        let myScore = myProg.lap * 100000 + myProg.currentCheckpoint * 10000 - myDist;
+
+        let rank = 1;
+        for (const pid in currentRaceProgress) {
+            if (pid !== playerShip.id) {
+                const p = currentRaceProgress[pid];
+                const pNextCp = raceCheckpoints[p.currentCheckpoint % raceCheckpoints.length];
+                let pDist = 0;
+                if (remotePlayers[pid] && pNextCp) {
+                    pDist = remotePlayers[pid].mesh.position.distanceTo(pNextCp.position);
+                }
+                const pScore = p.lap * 100000 + p.currentCheckpoint * 10000 - pDist;
+                
+                if (pScore > myScore) rank++;
+            }
+        }
+        
+        let rankStr = rank + "th Place";
+        if (rank === 1) rankStr = "1st Place";
+        if (rank === 2) rankStr = "2nd Place";
+        if (rank === 3) rankStr = "3rd Place";
+        
+        raceRankText.innerText = rankStr;
+        raceRankText.style.color = rank === 1 ? '#ffdd00' : (rank === 2 ? '#cccccc' : '#cc7722');
+    }
+
+    function checkRaceProgress() {
+        const myProg = currentRaceProgress[playerShip.id];
+        if (!myProg) return;
+        
+        const currentIdx = myProg.currentCheckpoint;
+        const cp = raceCheckpoints[currentIdx];
+        if (!cp) return;
+
+        const cpPos = new THREE.Vector3(cp.position.x, cp.position.y, cp.position.z);
+        const dist = playerShip.mesh.position.distanceTo(cpPos);
+        if (dist <= cp.radius) {
+            // Passed!
+            myProg.currentCheckpoint++;
+            if (myProg.currentCheckpoint >= raceCheckpoints.length) {
+                myProg.currentCheckpoint = 0;
+                myProg.lap++;
+            }
+            network.passCheckpoint(currentRoomId, currentIdx);
+            updateRaceCheckpointColors(myProg.currentCheckpoint);
+            updateRaceHUD();
+        }
+    }
+    function updateMatchScoreUI(data) {
+        matchScoreList.innerHTML = '';
+        const scores = data.scores || {};
+        
+        if (data.gameMode === 'tdm' && data.teamScores) {
+            const liRed = document.createElement('li');
+            liRed.innerHTML = `<span style="color:#ff4444;">RED</span><span>${data.teamScores.red || 0} K</span>`;
+            matchScoreList.appendChild(liRed);
+            const liBlue = document.createElement('li');
+            liBlue.innerHTML = `<span style="color:#33b5e5;">BLUE</span><span>${data.teamScores.blue || 0} K</span>`;
+            matchScoreList.appendChild(liBlue);
+            
+            // 区切り線
+            const hr = document.createElement('hr');
+            hr.style.borderColor = '#555';
+            hr.style.margin = '5px 0';
+            matchScoreList.appendChild(hr);
+        }
+
+        const sorted = Object.keys(scores).map(id => ({ id, score: scores[id] })).sort((a,b) => b.score - a.score);
+        sorted.forEach(entry => {
+            const li = document.createElement('li');
+            let pName = "Unknown";
+            if (entry.id === playerShip.id) pName = playerShip.displayName || localPlayerName;
+            else if (remotePlayers[entry.id]) pName = remotePlayers[entry.id].displayName || remotePlayers[entry.id].playerName || `Pilot_${entry.id.substring(0,4)}`;
+            
+            li.innerHTML = `<span>${pName}</span><span>${entry.score} K</span>`;
+            if (entry.id === playerShip.id) li.style.color = '#00ffff';
+            else if (data.gameMode === 'tdm' && currentTeams[entry.id] === 'red') li.style.color = '#ffaaaa';
+            else if (data.gameMode === 'tdm' && currentTeams[entry.id] === 'blue') li.style.color = '#33b5e5';
+            
+            matchScoreList.appendChild(li);
+        });
+    }
+
     flightController.onMissileTrigger = (isDown) => {
         if (isDown && flightController.viewMode === 'TPS' && playerShip.hp > 0 && missileCooldown <= 0) {
             // TPSではロックオンがないため正面に無誘導発射
             fireMissile(null);
         }
     };
+
+    // --- 被弾方向エフェクト ---
+    function createDamageIndicator(sourcePos) {
+        const dmgPointer = document.createElement('div');
+        dmgPointer.style.position = 'absolute';
+        dmgPointer.style.width = '0';
+        dmgPointer.style.height = '0';
+        dmgPointer.style.borderLeft = '30px solid transparent';
+        dmgPointer.style.borderRight = '30px solid transparent';
+        dmgPointer.style.borderBottom = '60px solid rgba(255, 100, 0, 0.8)';
+        dmgPointer.style.transformOrigin = '50% 50%';
+        dmgPointer.style.pointerEvents = 'none';
+        dmgPointer.style.filter = 'drop-shadow(0 0 15px orange)';
+        document.getElementById('ui-container').appendChild(dmgPointer);
+
+        const updateInterval = setInterval(() => {
+            const mPos = sourcePos.clone().project(engine.camera);
+            if (mPos.z > 1) { 
+                mPos.x *= -1;
+                mPos.y *= -1;
+            }
+            const dx = mPos.x;
+            const dy = -mPos.y;
+            const angleRad = Math.atan2(dy, dx);
+            const radius = window.innerHeight * 0.25; 
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            const pX = Math.cos(angleRad) * radius + centerX;
+            const pY = Math.sin(angleRad) * radius + centerY;
+            const angleDeg = angleRad * (180 / Math.PI) + 90; 
+            
+            dmgPointer.style.left = `${pX - 30}px`; 
+            dmgPointer.style.top = `${pY - 30}px`;
+            dmgPointer.style.transform = `rotate(${angleDeg}deg)`;
+        }, 16);
+
+        // 1秒かけてフェードアウト
+        let opacity = 0.8;
+        const fadeInterval = setInterval(() => {
+            opacity -= 0.05;
+            dmgPointer.style.borderBottomColor = `rgba(255, 100, 0, ${opacity})`;
+            if (opacity <= 0) {
+                clearInterval(updateInterval);
+                clearInterval(fadeInterval);
+                dmgPointer.remove();
+            }
+        }, 50);
+    }
 
     // --- ネットワークイベントの受信処理（HP・撃墜・復活） ---
     network.onHpUpdate = (data) => {
@@ -265,6 +1040,11 @@ window.onload = () => {
                 // ダメージを受けた時にフラッシュ
                 const damage = playerShip.hp - data.hp;
                 triggerDamageFlash(Math.min(0.8, damage / 50));
+                
+                // ダメージ方向インジケータ
+                if (data.shooterId && data.shooterId !== playerShip.id && remotePlayers[data.shooterId]) {
+                    createDamageIndicator(remotePlayers[data.shooterId].mesh.position);
+                }
             }
             playerShip.hp = data.hp;
             updateLocalHpUI(playerShip.hp);
@@ -317,6 +1097,8 @@ window.onload = () => {
         if (data.id === playerShip.id) {
             playerShip.mesh.visible = false; // 撃墜されたら非表示
             updateLocalHpUI(0);
+            flightController.enabled = false;
+            playerShip.currentSpeed = 0;
         } else {
             const enemy = remotePlayers[data.id];
             if (enemy) {
@@ -326,18 +1108,34 @@ window.onload = () => {
     };
 
     network.onPlayerRespawn = (data) => {
+        let targetMesh = null;
         if (data.id === playerShip.id) {
             playerShip.hp = 100;
             playerShip.mesh.position.copy(data.position);
             playerShip.mesh.visible = true; // 復活
             updateLocalHpUI(100);
             flightController.impactVelocity.set(0,0,0); // リスポーン時にノックバックリセット
+            
+            // レース開始前などカウントダウン中でなければ有効化
+            if (isMatchActive && !isCountdown) {
+                flightController.enabled = true;
+            }
+            
+            targetMesh = playerShip.mesh;
         } else {
             const enemy = remotePlayers[data.id];
             if (enemy) {
                 enemy.hp = 100;
                 enemy.mesh.position.copy(data.position);
                 enemy.mesh.visible = true;
+                targetMesh = enemy.mesh;
+            }
+        }
+
+        if (currentGameMode === 'race' && targetMesh) {
+            const currentIdx = currentRaceProgress[data.id] ? currentRaceProgress[data.id].currentCheckpoint : 0;
+            if (raceCheckpointsMeshes[currentIdx]) {
+                targetMesh.lookAt(raceCheckpointsMeshes[currentIdx].position);
             }
         }
     };
@@ -578,10 +1376,28 @@ window.onload = () => {
     // 4. ループ処理に追加
     engine.addUpdatable({
         update: (delta) => {
+            if (isMatchActive) {
+                const remaining = Math.max(0, matchEndTime - Date.now());
+                const m = Math.floor(remaining / 60000);
+                const s = Math.floor((remaining % 60000) / 1000);
+                matchTimer.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            }
+
             const aliveEnemies = enemyListForUI.filter(e => e.hp > 0);
             
             // レーダー更新
-            radar.update(aliveEnemies);
+            const radarTargets = [...aliveEnemies];
+            if (currentGameMode === 'race' && currentRaceProgress[playerShip.id]) {
+                const currentIdx = currentRaceProgress[playerShip.id].currentCheckpoint;
+                if (raceCheckpointsMeshes[currentIdx]) {
+                    radarTargets.push({
+                        mesh: raceCheckpointsMeshes[currentIdx],
+                        isEnemy: false,
+                        teamColor: '#00ff00' // green checkpoint
+                    });
+                }
+            }
+            radar.update(radarTargets);
             if (playerShip.radarTex) {
                 playerShip.radarTex.needsUpdate = true;
             }
@@ -597,6 +1413,16 @@ window.onload = () => {
             
             // 小惑星の更新（回転アニメーションとUI追従）
             asteroids.forEach(ast => ast.update(delta, engine.camera, window.innerWidth, window.innerHeight));
+
+            // マップの境界制限 (半径2000の球) - レースモード時は解除
+            if (currentGameMode !== 'race') {
+                const dist = playerShip.mesh.position.length();
+                if (dist > 2000) {
+                    playerShip.mesh.position.normalize().multiplyScalar(2000);
+                    // ぶつかったら速度を0にする
+                    playerShip.currentSpeed = 0;
+                }
+            }
 
             // ロックオン処理 (FPSモード＆右クリック中のみ＆クールダウンなし)
             if (flightController.viewMode === 'FPS' && flightController.isAiming && playerShip.hp > 0 && missileCooldown <= 0) {
@@ -757,8 +1583,20 @@ window.onload = () => {
             // 自機の無敵時間（連続激突防止）
             if (collisionCooldown > 0) collisionCooldown -= delta;
 
+            if (currentGameMode === 'race' && isMatchActive && !isCountdown && playerShip.hp > 0) {
+                checkRaceProgress();
+            }
+
+            // レースモードでの序盤の無敵状態判定
+            const isPlayerGhost = (pid) => {
+                if (currentGameMode !== 'race' || !currentRaceProgress[pid]) return false;
+                const prog = currentRaceProgress[pid];
+                return prog.lap === 1 && prog.currentCheckpoint === 0;
+            };
+            const isLocalGhost = isPlayerGhost(playerShip.id);
+
             // 機体 vs 小惑星・敵機の激突判定
-            if (playerShip.hp > 0 && collisionCooldown <= 0) {
+            if (playerShip.hp > 0 && collisionCooldown <= 0 && !isLocalGhost) {
                 // 対 小惑星
                 asteroids.forEach(ast => {
                     const dist = playerShip.mesh.position.distanceTo(ast.mesh.position);
@@ -774,6 +1612,7 @@ window.onload = () => {
 
                 // 対 他のプレイヤー
                 for (const enemy of aliveEnemies) {
+                    if (isPlayerGhost(enemy.id)) continue;
                     const dist = playerShip.mesh.position.distanceTo(enemy.mesh.position);
                     if (dist < 4 && collisionCooldown <= 0) {
                         network.sendHit(playerShip.id, 15); // 衝突で15ダメージ
@@ -781,6 +1620,30 @@ window.onload = () => {
                         const pushDir = playerShip.mesh.position.clone().sub(enemy.mesh.position).normalize();
                         flightController.applyImpact(pushDir, 100);
                         collisionCooldown = 0.5;
+                    }
+                }
+
+                // 対 レース専用障害物
+                if (currentGameMode === 'race' && raceObstaclesData && raceObstaclesData.length > 0) {
+                    for (const obs of raceObstaclesData) {
+                        let hitDist = obs.radius + 2;
+                        // 当たり判定を種類によって緩和する
+                        if (obs.type === 'station') hitDist = obs.radius * 0.4; // 巨大リングはすり抜け可能にし、中心ハブのみ当たるように
+                        else if (obs.type === 'ship') hitDist = obs.radius * 0.5; // 細長いので判定を半減
+                        else hitDist = obs.radius * 0.8; // 小惑星も少しだけ判定を甘くして疾走感を損なわないように
+                        const dx = playerShip.mesh.position.x - obs.position.x;
+                        const dy = playerShip.mesh.position.y - obs.position.y;
+                        const dz = playerShip.mesh.position.z - obs.position.z;
+                        const distSq = dx*dx + dy*dy + dz*dz;
+                        if (distSq < hitDist * hitDist && collisionCooldown <= 0) {
+                            network.sendHit(playerShip.id, 20); // レース障害物は20ダメージ
+                            triggerDamageFlash(0.8);
+                            const obsPos = new THREE.Vector3(obs.position.x, obs.position.y, obs.position.z);
+                            const pushDir = playerShip.mesh.position.clone().sub(obsPos).normalize();
+                            flightController.applyImpact(pushDir, 150); // 激しく弾かれる
+                            collisionCooldown = 0.5;
+                            break;
+                        }
                     }
                 }
             }
@@ -797,6 +1660,7 @@ window.onload = () => {
                 if (p.ownerId === playerShip.id && !p.isDead) {
                     // 対 敵機
                     for (const enemy of aliveEnemies) {
+                        if (isPlayerGhost(enemy.id)) continue;
                         if (p.mesh.position.distanceTo(enemy.mesh.position) < 8) {
                             hitTargetPlayer = enemy;
                             break;
@@ -813,7 +1677,7 @@ window.onload = () => {
                     }
                 } else if (p.ownerId !== playerShip.id && !p.isDead) {
                     // 他人が撃った弾が自分や小惑星に当たった場合の見た目上の消滅処理（サーバー報告は撃った本人が行うためここでは行わない）
-                    if (p.mesh.position.distanceTo(playerShip.mesh.position) < 8) {
+                    if (!isLocalGhost && p.mesh.position.distanceTo(playerShip.mesh.position) < 8) {
                         p.isDead = true;
                         createHitEffect(p.mesh.position);
                     } else {

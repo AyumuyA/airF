@@ -32,6 +32,7 @@ body {
   color: rgba(0, 255, 0, 0.7);
   font-size: 24px;
   font-weight: bold;
+  z-index: 100;
 }
 
 /* メニューオーバーレイ */
@@ -274,4 +275,209 @@ body {
 @keyframes slideInLeft {
   from { opacity: 0; transform: translateX(-20px); }
   to { opacity: 1; transform: translateX(0); }
+}
+
+/* --- Matchmaking UI --- */
+#room-list-container, #room-lobby-container {
+  margin-top: 20px;
+}
+#room-list {
+  list-style: none;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+#room-list li {
+  background: rgba(0, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.btn-join-room {
+  background: rgba(0, 255, 255, 0.2);
+  border: 1px solid #00ffff;
+  color: #fff;
+  padding: 5px 10px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.btn-join-room:hover {
+  background: #00ffff;
+  color: #000;
+}
+.room-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+/* --- In-Game Match HUD --- */
+#match-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 40;
+}
+#match-timer {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 32px;
+  font-weight: bold;
+  font-family: monospace;
+  color: #fff;
+  text-shadow: 0 0 10px #00ffff;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 5px 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 255, 255, 0.5);
+}
+#match-scoreboard {
+  position: absolute;
+  top: 250px;
+  right: 20px;
+  width: 200px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 10px;
+  color: #fff;
+}
+#match-scoreboard h3 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #00ffff;
+  text-align: center;
+  border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+  padding-bottom: 5px;
+}
+#match-score-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+#match-score-list li {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+/* --- Match Result Screen --- */
+#match-result-screen {
+  position: absolute;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+.result-box {
+  background: rgba(10, 20, 40, 0.9);
+  padding: 40px;
+  border-radius: 12px;
+  border: 2px solid #00ffcc;
+  text-align: center;
+  min-width: 400px;
+  box-shadow: 0 0 30px rgba(0, 255, 204, 0.3);
+}
+
+.result-box h1 {
+  font-size: 48px;
+  color: #00ffcc;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+}
+
+.result-box h2 {
+  font-size: 24px;
+  color: #fff;
+  margin-bottom: 15px;
+}
+
+#result-score-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 30px 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+#result-score-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  margin-bottom: 5px;
+  border-radius: 5px;
+  font-size: 20px;
+  color: #fff;
+}
+
+#host-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+#guest-controls p {
+  color: #aaaaaa;
+  font-style: italic;
+  margin-bottom: 15px;
+}
+#match-winner-name {
+  font-size: 4rem;
+  color: #ffcc00;
+  text-shadow: 0 0 20px rgba(255, 204, 0, 0.8);
+  margin-bottom: 20px;
+  animation: popIn 0.5s ease-out;
+}
+
+@keyframes popIn {
+  0% { transform: scale(0.5); opacity: 0; }
+  80% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+#match-countdown-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1500;
+  pointer-events: none;
+}
+#match-countdown-text {
+  font-size: 8rem;
+  color: #00ffff;
+  text-shadow: 0 0 30px #00ffff;
+  font-family: 'Inter', sans-serif;
+  animation: countdownPulse 1s ease-in-out infinite;
+}
+
+@keyframes countdownPulse {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+.hidden {
+  display: none !important;
 }

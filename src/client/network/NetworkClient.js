@@ -71,6 +71,34 @@ export class NetworkClient {
         this.socket.on('playerNameUpdate', (data) => {
             if (this.onNameUpdate) this.onNameUpdate(data);
         });
+        
+        // Matchmaking
+        this.socket.on('roomListUpdate', (data) => {
+            if (this.onRoomListUpdate) this.onRoomListUpdate(data);
+        });
+        this.socket.on('matchStarted', (data) => {
+            if (this.onMatchStarted) this.onMatchStarted(data);
+        });
+        this.socket.on('matchScoreUpdate', (data) => {
+            if (this.onMatchScoreUpdate) this.onMatchScoreUpdate(data);
+        });
+        this.socket.on('matchEnded', (data) => {
+            if (this.onMatchEnded) this.onMatchEnded(data);
+        });
+
+        this.socket.on('raceProgressUpdate', (data) => {
+            if (this.onRaceProgressUpdate) this.onRaceProgressUpdate(data);
+        });
+
+        this.socket.on('returnedToLobby', () => {
+            if (this.onReturnedToLobby) this.onReturnedToLobby();
+        });
+        this.socket.on('returnedToRoomMenu', (roomId) => {
+            if (this.onReturnedToRoomMenu) this.onReturnedToRoomMenu(roomId);
+        });
+        this.socket.on('hostMigrated', (newHostId) => {
+            if (this.onHostMigrated) this.onHostMigrated(newHostId);
+        });
     }
 
     // 自機の状態（座標と回転）をサーバーに送信する
@@ -118,6 +146,66 @@ export class NetworkClient {
     sendName(name) {
         if (this.socket && this.socket.connected) {
             this.socket.emit('playerNameUpdate', { name: name });
+        }
+    }
+
+    createRoom(name) {
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('createRoom', { name });
+        }
+    }
+
+    joinRoom(roomId) {
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('joinRoom', roomId);
+        }
+    }
+
+    leaveRoom(roomId) {
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('leaveRoom', roomId);
+        }
+    }
+
+    startMatch(roomId) {
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('startMatch', roomId);
+        }
+    }
+
+    rematch(roomId) {
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('rematch', roomId);
+        }
+    }
+
+    returnToRoomMenu(roomId) {
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('returnToRoomMenu', roomId);
+        }
+    }
+
+    leaveMatch(roomId) {
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('leaveMatch', roomId);
+        }
+    }
+
+    changeGameMode(roomId, gameMode) {
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('changeGameMode', { roomId, gameMode });
+        }
+    }
+
+    changeTeam(roomId, team) {
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('changeTeam', { roomId, team });
+        }
+    }
+
+    passCheckpoint(roomId, cpIndex) {
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('passCheckpoint', roomId, cpIndex);
         }
     }
 }

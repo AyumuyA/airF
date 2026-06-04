@@ -9,8 +9,7 @@ export default defineConfig({
       '/airF/socket.io': {
         target: 'http://127.0.0.1:8080',
         ws: true,
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/airF/, '') // サーバー側には元の /socket.io として転送
+        changeOrigin: true
       }
     }
   }

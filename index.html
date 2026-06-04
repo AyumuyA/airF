@@ -18,6 +18,43 @@
       <!-- キルログ表示エリア -->
       <div id="kill-log"></div>
 
+      <!-- マッチ中の専用HUD -->
+      <div id="match-hud" class="hidden">
+        <div id="match-timer">05:00</div>
+        <div id="match-scoreboard">
+          <h3>LEADERBOARD</h3>
+          <ul id="match-score-list"></ul>
+        </div>
+        
+        <div id="race-hud" class="hidden" style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); text-align: center; color: white; text-shadow: 0 0 5px black, 0 0 10px blue;">
+          <h1 id="race-lap" style="font-size: 3em; margin: 0;">LAP 1 / 3</h1>
+          <h2 id="race-rank" style="font-size: 2em; margin: 0; color: #ffdd00;">1st Place</h2>
+        </div>
+      </div>
+      
+      <!-- マッチ終了画面 -->
+      <div id="match-result-screen" class="hidden">
+        <div class="result-box">
+          <h1 id="match-winner-name">WINNER</h1>
+          <h2>LEADERBOARD</h2>
+          <ul id="result-score-list"></ul>
+          
+          <div id="host-controls" class="hidden">
+             <button id="btn-rematch" class="btn-primary">Rematch (Same Rules)</button>
+             <button id="btn-change-rules" class="btn-secondary">Change Rules</button>
+          </div>
+          <div id="guest-controls">
+             <p>Waiting for host to decide...</p>
+          </div>
+          <button id="btn-leave-match" class="btn-danger">Leave Match</button>
+        </div>
+      </div>
+      
+      <!-- カウントダウン画面 -->
+      <div id="match-countdown-screen" class="hidden">
+        <h1 id="match-countdown-text">3</h1>
+      </div>
+
       <!-- メニューオーバーレイ -->
       <div id="game-menu">
         <div class="menu-container">
@@ -48,9 +85,37 @@
             <!-- マッチ -->
             <div id="tab-match" class="tab-pane hidden">
               <h2>マッチメイク</h2>
-              <p>現在はロビー（待機場）です。</p>
-              <button id="btn-create-match" disabled>ルーム作成 (Coming Soon)</button>
-              <button id="btn-join-match" disabled>ルーム参加 (Coming Soon)</button>
+              
+              <div id="room-list-container">
+                <h3>ルーム一覧 (ロビー待機中)</h3>
+                <ul id="room-list"></ul>
+                <div class="room-actions">
+                  <input type="text" id="room-name-input" placeholder="ルーム名" maxlength="15" />
+                  <button id="btn-create-room">ルーム作成</button>
+                </div>
+              </div>
+
+              <!-- 部屋待機画面 -->
+              <div id="room-lobby-container" class="hidden">
+                <h2>ROOM: <span id="current-room-name"></span></h2>
+                
+                <div id="room-settings" style="margin-bottom: 20px; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px;">
+                  <div style="margin-bottom: 10px;">
+                    <label for="game-mode-select">Game Mode:</label>
+                    <select id="game-mode-select" disabled>
+                      <option value="ffa">Free For All (FFA)</option>
+                      <option value="tdm">Team Deathmatch (TDM)</option>
+                      <option value="race">Racing Mode</option>
+                    </select>
+                  </div>
+                </div>
+
+                <ul id="room-participants"></ul>
+                <div style="margin-top: 20px; display: flex; gap: 10px;">
+                  <button id="btn-start-match" class="btn-primary hidden">Start Match</button>
+                  <button id="btn-leave-room" class="btn-danger">Leave Room</button>
+                </div>
+              </div>
             </div>
             <!-- プロフィール -->
             <div id="tab-profile" class="tab-pane hidden">

@@ -30,24 +30,43 @@ export class Radar {
             const relativePos = target.mesh.position.clone().sub(this.player.mesh.position);
             const distance = relativePos.length();
 
-            if (distance > this.maxRadius) return; // 範囲外は描画しない
-
             // 2. 自機の回転（クォータニオン）の逆をかけて、自機基準の相対座標に変換する
             // 常に自機の向いている方向がレーダーの上（-Y）になるようにする
             const inversePlayerQ = this.player.mesh.quaternion.clone().invert();
             relativePos.applyQuaternion(inversePlayerQ);
 
+            let isOutOfBounds = false;
+            let drawPos = relativePos.clone();
+
+            if (distance > this.maxRadius) {
+                isOutOfBounds = true;
+                // レーダーの少し内側（エッジ）に制限する
+                drawPos.normalize().multiplyScalar(this.maxRadius * 0.95);
+            }
+
             // 3. 2Dレーダーへのマッピング
-            // 3D空間の -Z方向 をレーダーの上(-Y), X方向 をレーダーの右(+X) とする
             const scale = (this.canvas.width / 2) / this.maxRadius;
-            const radarX = this.center.x + (relativePos.x * scale);
-            const radarY = this.center.y + (relativePos.z * scale); // 3D空間のZ座標をそのままYとして使う
+            const radarX = this.center.x + (drawPos.x * scale);
+            const radarY = this.center.y + (drawPos.z * scale); 
 
             // 描画
-            this.ctx.fillStyle = target.isEnemy ? '#ff0000' : '#ffff00';
+            let color = target.isEnemy ? '#ff0000' : '#33b5e5'; // 味方は明るい青
+            if (target.teamColor) color = target.teamColor;
+            
+            this.ctx.fillStyle = color;
+            this.ctx.strokeStyle = color;
+            this.ctx.lineWidth = 2;
+            
             this.ctx.beginPath();
-            this.ctx.arc(radarX, radarY, 4, 0, Math.PI * 2);
-            this.ctx.fill();
+            if (isOutOfBounds) {
+                // 範囲外は外周の枠だけの円を描画する
+                this.ctx.arc(radarX, radarY, 4, 0, Math.PI * 2);
+                this.ctx.stroke();
+            } else {
+                // 範囲内は塗りつぶされた円
+                this.ctx.arc(radarX, radarY, 4, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
         });
 
         // 3D用テクスチャの更新をThree.jsに通知

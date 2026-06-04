@@ -1,4 +1,4 @@
 export const config = {
-    // Viteのプロキシ機能を利用して、ポート3000番経由でWebSocketに繋ぐ
-    SERVER_URL: window.location.origin
+    // 常にバックエンドの55665番ポートを直接指定して通信する
+    SERVER_URL: window.location.protocol + '//' + window.location.hostname + ':55665'
 };

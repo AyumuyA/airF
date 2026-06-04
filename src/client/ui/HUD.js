@@ -78,10 +78,14 @@ export class HUD {
 
             // 色の決定（HP残量によって変化）
             let color = '#00ffcc'; // デフォルト（青緑）
-            if (hp <= 50) color = '#ffff00'; // 50%以下（黄）
-            if (hp <= 20) color = '#ff3333'; // 20%以下（赤）
+            if (target.teamColor) {
+                color = target.teamColor;
+            } else {
+                if (hp <= 50) color = '#ffff00'; // 50%以下（黄）
+                if (hp <= 20) color = '#ff3333'; // 20%以下（赤）
+            }
             
-            const displayName = target.displayName || target.playerName || 'ENEMY';
+            const displayName = target.displayName || target.playerName || (target.isEnemy ? 'ENEMY' : 'ALLY');
 
             markerEl.style.display = 'block';
             markerEl.style.left = `${boxX}px`;

@@ -5,7 +5,8 @@ export class Ship {
     constructor(type = 'TYPE_A', id = 'player', isEnemy = false) {
         this.id = id;
         this.isEnemy = isEnemy;
-        this.stats = SHIP_STATS[type];
+        this.stats = { ...SHIP_STATS[type] };
+        this.originalStats = { ...SHIP_STATS[type] };
         
         // 機体のメッシュ作成（丸みを持たせたジェット機風のデザイン）
         this.mesh = new THREE.Group();
